@@ -1,15 +1,15 @@
 const admin = require("../config/firebase");
 const getPagination = require("../utility/getPagination");
-const { tMateris: materiModel } = require("../models");
+const { tEvents: eventModel } = require("../models");
 const { Op } = require("sequelize");
 const bucket = admin.storage().bucket();
 
-exports.CreateMateri = async (req, res, next) => {
+exports.CreateEvents = async (req, res, next) => {
   let data;
   let pathImage;
   if (req.file) {
     data = bucket.file(
-      `materi-image/${new Date().getTime()}.${req.file.mimetype.split("/")[1]}`
+      `event-image/${new Date().getTime()}.${req.file.mimetype.split("/")[1]}`
     );
     await data.save(req.file.buffer);
     pathImage = `https://firebasestorage.googleapis.com/v0/b/${
@@ -18,26 +18,33 @@ exports.CreateMateri = async (req, res, next) => {
   }
 
   try {
-    if (!req.body.title || !req.body.description || !req.file) {
-      throw new Error("title, description, and image is required");
+    if (
+      !req.body.title ||
+      !req.body.description ||
+      !req.body.eventDate ||
+      !req.file
+    ) {
+      throw new Error("title, description,evenDate, and image is required");
     }
 
-    const materi = await materiModel.create({
+    const event = await eventModel.create({
       title: req.body.title,
+      eventDate: req.body.eventDate,
       description: req.body.description,
       image: pathImage,
     });
-    if (materi) {
+    if (event) {
       res.status(201).json({
         success: true,
-        msg: "Create Materi Success",
+        msg: "Create event Success",
         data: {
-          id: materi.get("id"),
-          title: materi.get("title"),
-          description: materi.get("description"),
-          image: materi.get("image"),
-          createdAt: materi.get("createdAt"),
-          updatedAt: materi.get("updatedAt"),
+          id: event.get("id"),
+          title: event.get("title"),
+          description: event.get("description"),
+          eventDate: event.get("eventDate"),
+          image: event.get("image"),
+          createdAt: event.get("createdAt"),
+          updatedAt: event.get("updatedAt"),
         },
       });
     } else {
@@ -54,27 +61,22 @@ exports.CreateMateri = async (req, res, next) => {
   }
 };
 
-exports.GetAllMateri = async (req, res, next) => {
+exports.GetAllEvent = async (req, res, next) => {
   try {
     const params = {
       currentPage: parseInt(req.query.page) || 1,
       perPage: parseInt(req.query.limit) || 12,
     };
-    const dataMateri = await materiModel.findAndCountAll({
-      where: {
-        title: {
-          [Op.like]: `%${req.query.q || ""}%`,
-        },
-      },
+    const dataEvent = await eventModel.findAndCountAll({
       limit: params.perPage,
       offset: parseInt(params.perPage) * (parseInt(params.currentPage) - 1),
       order: [["createdAt", "DESC"]],
     });
-    if (dataMateri.rows.length > 0) {
+    if (dataEvent.rows.length > 0) {
       res.status(200).send({
         success: true,
-        data: dataMateri.rows,
-        pagination: getPagination(req, params, dataMateri.count),
+        data: dataEvent.rows,
+        pagination: getPagination(req, params, dataEvent.count),
       });
     } else {
       res.status(200).send({
@@ -90,36 +92,13 @@ exports.GetAllMateri = async (req, res, next) => {
     next(error);
   }
 };
-exports.GetDetailMateri = async (req, res, next) => {
-  try {
-    const dataMater = await materiModel.findOne({
-      where: { id: req.params.id },
-    });
-    if (dataMater) {
-      res.status(200).send({
-        success: true,
-        data: dataMater.dataValues,
-      });
-    } else {
-      res.status(404).send({
-        success: false,
-        msg: "Materi Not Found",
-      });
-    }
-  } catch (err) {
-    console.log(err);
-    const error = new Error(err.message || "Something Error");
-    error.status = 202;
-    next(error);
-  }
-};
 
-exports.updateDataMateri = async (req, res, next) => {
+exports.updateDataEvent = async (req, res, next) => {
   let data;
   let pathImage;
   if (req.file) {
     data = bucket.file(
-      `materi-image/${new Date().getTime()}.${req.file.mimetype.split("/")[1]}`
+      `event-image/${new Date().getTime()}.${req.file.mimetype.split("/")[1]}`
     );
     await data.save(req.file.buffer);
     pathImage = `https://firebasestorage.googleapis.com/v0/b/${
@@ -127,12 +106,12 @@ exports.updateDataMateri = async (req, res, next) => {
     }/o/${encodeURIComponent(data.name)}?alt=media`;
   }
   try {
-    const fillAble = ["title", "description", "image"];
+    const fillAble = ["title", "description", "eventDate", "image"];
 
-    let materi = await materiModel.findOne({
+    let event = await eventModel.findOne({
       where: { id: req.params.id },
     });
-    if (materi) {
+    if (event) {
       const dataToUpdate = {};
       fillAble.forEach((v) => {
         if (v == "image" && pathImage) {
@@ -144,35 +123,35 @@ exports.updateDataMateri = async (req, res, next) => {
       if (!(Object.keys(dataToUpdate).length > 0)) {
         throw new Error("Please defined update data");
       }
-      const updateData = await materiModel.update(dataToUpdate, {
+      const updateData = await eventModel.update(dataToUpdate, {
         where: { id: req.params.id },
       });
-      if (updateData && pathImage && materi.dataValues.image) {
+      if (updateData && pathImage && event.dataValues.image) {
         await bucket
           .file(
-            `materi-image/${
-              materi.dataValues.image
+            `event-image/${
+              event.dataValues.image
                 .substring(
-                  materi.dataValues.image.indexOf("materi-image%2F"),
-                  materi.dataValues.image.indexOf("?alt=media")
+                  event.dataValues.image.indexOf("event-image%2F"),
+                  event.dataValues.image.indexOf("?alt=media")
                 )
                 .split("%2F")[1]
             }`
           )
           .delete();
       }
-      materi = await materiModel.findOne({
+      event = await eventModel.findOne({
         where: { id: req.params.id },
       });
       res.status(200).json({
         success: true,
-        msg: "Updated materi Success",
-        data: materi.dataValues,
+        msg: "Updated event Success",
+        data: event.dataValues,
       });
     } else {
       res.status(404).send({
         success: false,
-        msg: "materi Not Found",
+        msg: "event Not Found",
       });
     }
   } catch (err) {
@@ -186,24 +165,24 @@ exports.updateDataMateri = async (req, res, next) => {
   }
 };
 
-exports.DeleteMateri = async (req, res, next) => {
+exports.DeleteEvent = async (req, res, next) => {
   try {
-    const dataMateri = await materiModel.findOne({
+    const dataEvent = await eventModel.findOne({
       where: { id: req.params.id },
     });
 
-    if (!dataMateri) {
-      throw new Error("Materi Not Found");
+    if (!dataEvent) {
+      throw new Error("Event Not Found");
     }
-    await dataMateri.destroy();
-    if (dataMateri.dataValues.image) {
+    await dataEvent.destroy();
+    if (dataEvent.dataValues.image) {
       await bucket
         .file(
-          `materi-image/${
-            dataMateri.dataValues.image
+          `event-image/${
+            dataEvent.dataValues.image
               .substring(
-                dataMateri.dataValues.image.indexOf("materi-image%2F"),
-                dataMateri.dataValues.image.indexOf("?alt=media")
+                dataEvent.dataValues.image.indexOf("event-image%2F"),
+                dataEvent.dataValues.image.indexOf("?alt=media")
               )
               .split("%2F")[1]
           }`
@@ -213,7 +192,7 @@ exports.DeleteMateri = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      msg: "Delete Materi Success",
+      msg: "Delete Event Success",
     });
   } catch (err) {
     const error = new Error(err.message || "Something Error");
