@@ -9,14 +9,6 @@ module.exports = {
           name: "Admin",
           code: "ADM",
         },
-        {
-          name: "Employee",
-          code: "EPY",
-        },
-        {
-          name: "Customer",
-          code: "CMR",
-        },
       ],
       {}
     );
